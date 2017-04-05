@@ -828,6 +828,8 @@ class Synapse:
 
                 else:
                     downloadPath = utils.normalize_path(os.path.join(downloadLocation, fileName))
+                    print("====downloadpath")
+                    print(downloadPath)
                     if downloadPath != cached_file_path:
                         if not downloadFile:
                             ## This is a strange case where downloadLocation is
@@ -879,7 +881,7 @@ class Synapse:
                                                           downloadPath, fileResult['fileHandle'])
 
                 self.cache.add(entityBundle['entity']['dataFileHandleId'], downloadPath)
-
+                print("added entity to cache")
                 if 'path' in entity and (entity['path'] is None or not os.path.exists(entity['path'])):
                     entity['synapseStore'] = False
 
