@@ -105,7 +105,7 @@ class Cache():
         if not os.path.exists(cache_map_file):
             return {}
 
-        with open(cache_map_file, 'r') as f:
+        with open(cache_map_file, 'r', 0) as f:
             cache_map = json.load(f)
         return cache_map
 
@@ -116,10 +116,9 @@ class Cache():
 
         cache_map_file = os.path.join(cache_dir, self.cache_map_file_name)
 
-        with open(cache_map_file, 'w') as f:
+        with open(cache_map_file, 'w', 0) as f:
             json.dump(cache_map, f)
             f.write('\n') # For compatibility with R's JSON parser
-            f.flush()
         #print("flushed to disk")
 
     def contains(self, file_handle_id, path):
