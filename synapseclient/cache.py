@@ -119,7 +119,8 @@ class Cache():
         with open(cache_map_file, 'w') as f:
             json.dump(cache_map, f)
             f.write('\n') # For compatibility with R's JSON parser
-
+            f.flush()
+        #print("flushed to disk")
 
     def contains(self, file_handle_id, path):
         """
