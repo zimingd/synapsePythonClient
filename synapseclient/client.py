@@ -748,6 +748,7 @@ class Synapse:
         """
 
         # Note: This version overrides the version of 'entity' (if the object is Mappable)
+        print("==============+GETMEFMDFSLFJSDFLKSDJFLSDF==========")
         version = kwargs.get('version', None)
         downloadFile = kwargs.get('downloadFile', True)
         downloadLocation = kwargs.get('downloadLocation', None)
@@ -837,6 +838,7 @@ class Synapse:
                             entity.cacheDir = None
                         else:
                             ## TODO apply ifcollision here
+                            print("=====================YEP HERE===============")
                             shutil.copy(cached_file_path, downloadPath)
 
                             entity.path = downloadPath
@@ -860,6 +862,8 @@ class Synapse:
                     if ifcollision == "overwrite.local":
                         pass
                     elif ifcollision == "keep.local":
+                        print("=====================downloadFile = False===============")
+
                         downloadFile = False
                     elif ifcollision == "keep.both":
                         downloadPath = utils.unique_filename(downloadPath)
