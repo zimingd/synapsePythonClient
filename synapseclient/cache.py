@@ -105,7 +105,7 @@ class Cache():
         if not os.path.exists(cache_map_file):
             return {}
 
-        with open(cache_map_file, 'r', 0) as f:
+        with open(cache_map_file, 'r') as f:
             cache_map = json.load(f)
         return cache_map
 
