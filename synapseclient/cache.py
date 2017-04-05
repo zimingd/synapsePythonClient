@@ -121,7 +121,7 @@ class Cache():
             json.dump(cache_map, f)
             f.write('\n') # For compatibility with R's JSON parser
             f.flush()
-            os.fsync()
+            os.fsync(f)
             print("flushed to disk")
         
 
