@@ -302,6 +302,9 @@ def test_get_with_downloadLocation_and_ifcollision():
     overwriteModTime = os.path.getmtime(overwriteBogus.path)
     assert badtimestamps != overwriteModTime
     
+    print("sleeping for 5 seconds")
+    time.sleep(5)
+
     # Download again, should not change the modification time
     otherBogus = syn.get(bogus, downloadLocation=os.path.dirname(filepath), ifcollision="keep.local")
     assert overwriteModTime == os.path.getmtime(otherBogus.path)
