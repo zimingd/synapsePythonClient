@@ -813,6 +813,9 @@ class Synapse:
             # if downloadFile
             #   download it
             #   add it to the cache
+            print(ifcollision)
+            print("=======cached_file_path")
+            print(cached_file_path)
             if cached_file_path is not None:
 
                 fileName = os.path.basename(cached_file_path)
@@ -836,6 +839,7 @@ class Synapse:
                             entity.cacheDir = None
                         else:
                             ## TODO apply ifcollision here
+                            print("=====HEREH====")
                             shutil.copy(cached_file_path, downloadPath)
 
                             entity.path = downloadPath
@@ -856,9 +860,11 @@ class Synapse:
 
                 # If the file already exists but has been modified since caching
                 if os.path.exists(downloadPath):
+                    print("os.path.exists(downloadPath)")
                     if ifcollision == "overwrite.local":
                         pass
                     elif ifcollision == "keep.local":
+                        print("downloadFile = False")
                         downloadFile = False
                     elif ifcollision == "keep.both":
                         downloadPath = utils.unique_filename(downloadPath)
