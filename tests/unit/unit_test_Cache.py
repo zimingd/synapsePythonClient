@@ -265,6 +265,7 @@ def test_cache_rules():
     empty_dir = os.path.join(tmp_dir, "empty_directory")
     os.makedirs(empty_dir)
     path = my_cache.get(file_handle_id=101201, path=empty_dir)
+    print("+++++++++RIP++++",path,path3)
     assert utils.equal_paths(path, path3)
 
     ## path2 is now modified
