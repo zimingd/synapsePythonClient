@@ -70,6 +70,7 @@ def compare_timestamps(modified_time, cached_time):
 def _get_modified_time(path):
     if os.path.exists(path):
         return os.path.getmtime(path)
+    print(path," does not exist")
     return None
 
 
@@ -107,7 +108,7 @@ class Cache():
 
         with open(cache_map_file, 'r') as f:
             cache_map = json.load(f)
-            # print("read cache file")
+            print("read cache file")
         return cache_map
 
 
@@ -122,7 +123,7 @@ class Cache():
             f.write('\n') # For compatibility with R's JSON parser
             f.flush()
             os.fsync(f.fileno())
-            # print("flushed to disk")
+            print("flushed to disk")
         
 
     def contains(self, file_handle_id, path):
@@ -166,7 +167,8 @@ class Cache():
 
         with Lock(self.cache_map_file_name, dir=cache_dir):
             cache_map = self._read_cache_map(cache_dir)
-
+            print("LOOKING FOR ", path)
+            print("Key exists?", cache_map)
             path = utils.normalize_path(path)
 
             ## If the caller specifies a path and that path exists in the cache
@@ -179,8 +181,14 @@ class Cache():
                 if os.path.isdir(path):
                     for cached_file_path, cached_time in six.iteritems(cache_map):
                         if path == os.path.dirname(cached_file_path):
-                            return cached_file_path if compare_timestamps(_get_modified_time(cached_file_path), cached_time) else None
-
+                            print("##########lookin at file directory", _get_modified_time(cached_file_path), cached_time)
+                            if os.path.exists(cached_file_path):
+                                print("#####trying to use ",cached_file_path)
+                                return cached_file_path if compare_timestamps(_get_modified_time(cached_file_path), cached_time) else None
+                            else:
+                                print(cached_file_path, " does not exist trying next one")
+                    print("###########found no matches at all for directory")
+                    return None
                 ## if we're given a full file path, look up a matching file in the cache
                 else:
                     cached_time = cache_map.get(path, None)
@@ -192,7 +200,7 @@ class Cache():
             for cached_file_path, cached_time in sorted(cache_map.items(), key=operator.itemgetter(1), reverse=True):
                 if compare_timestamps(_get_modified_time(cached_file_path), cached_time):
                     return cached_file_path
-
+            print("===HERE==")
             return None
 
 
