@@ -621,3 +621,9 @@ def test_store__changing_from_Synapse_to_externalURL_by_changing_path():
 
 
 
+def test_Entity_subclasses_repr():
+    #File
+    # file_entity = syn.store(File('~/idk.txt', synapseStore=False, parent=project))
+    # file_repr = repr(file_entity)
+    # eval(file_repr)
+    pass

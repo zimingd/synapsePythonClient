@@ -623,7 +623,6 @@ _entity_type_to_class = {}
 for cls in itersubclasses(Entity):
     _entity_type_to_class[cls._synapse_entity_type] = cls
 
-_entity_types = ["project","folder","file","table","link","entityview","dockerrepo"]
 
 def split_entity_namespaces(entity):
     """
@@ -664,20 +663,11 @@ def split_entity_namespaces(entity):
     return (properties, annotations, local_state)
 
 
-
-ENTITY_TYPES = [
-    'org.sagebionetworks.repo.model.FileEntity',
-    'org.sagebionetworks.repo.model.Folder',
-    'org.sagebionetworks.repo.model.Link',
-    'org.sagebionetworks.repo.model.Project',
-    'org.sagebionetworks.repo.model.table.TableEntity'
-]
-
 def is_synapse_entity(entity):
     if isinstance(entity, Entity):
         return True
     if isinstance(entity, collections.Mapping):
-        return entity.get('concreteType', None) in ENTITY_TYPES
+        return entity.get('concreteType', None) in _entity_type_to_class
     return False
 
 
