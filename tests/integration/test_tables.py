@@ -458,7 +458,7 @@ def test_download_table_files():
 
     ## upload files and store file handle ids
     original_files = []
-    print("++++++++++++++++++++++++++++++++filehandles pls+++++++++")
+    print("++++++++++++++++++++++++++++++++filehandles pls++++++++++")
     for row in data:
         path = utils.make_bogus_data_file()
         original_files.append(path)
