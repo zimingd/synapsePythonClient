@@ -458,11 +458,13 @@ def test_download_table_files():
 
     ## upload files and store file handle ids
     original_files = []
+    print("++++++++++++++++++++++++++++++++filehandles pls+++++++++")
     for row in data:
         path = utils.make_bogus_data_file()
         original_files.append(path)
         schedule_for_cleanup(path)
         file_handle = syn.uploadFileHandle(path, project)
+        print(file_handle)
         row[4] = file_handle['id']
 
     row_reference_set = syn.store(RowSet(columns=cols, schema=schema, rows=[Row(r) for r in data]))
