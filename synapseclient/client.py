@@ -1187,47 +1187,45 @@ class Synapse:
             self._user_name_cache[user_id] = utils.extract_user_name(self.getUserProfile(user_id))
         return self._user_name_cache[user_id]
 
-
-    def _list(self, parent, recursive=False, long_format=False, show_modified=False, indent=0, out=sys.stdout):
+    def list(self, parent, recursive=False, long_format=False, show_modified=False, indent=0, out=sys.stdout):
         """
         List child objects of the given parent, recursively if requested.
         """
-        fields = ['id', 'name', 'nodeType']
-        if long_format:
-            fields.extend(['createdByPrincipalId','createdOn','versionNumber'])
-        if show_modified:
-            fields.extend(['modifiedByPrincipalId', 'modifiedOn'])
-        query = 'select ' + ','.join(fields) + \
-                ' from entity where %s=="%s"' % ('id' if indent==0 else 'parentId', id_of(parent))
-        results = self.chunkedQuery(query)
+
+        date_format_str = "%Y-%m-%dT%H:%M:%S.%fZ"
 
         results_found = False
-        for result in results:
+        for result in self.getChildren(parent):
             results_found = True
 
-            fmt_fields = {'name' : result['entity.name'],
-                          'id' : result['entity.id'],
+            fmt_fields = {'name' : result['name'],
+                          'id' : result['id'],
                           'padding' : ' ' * indent,
                           'slash_or_not' : '/' if is_container(result) else ''}
             fmt_string = "{id}"
 
-            if long_format:
-                fmt_fields['createdOn'] = utils.from_unix_epoch_time(result['entity.createdOn']).strftime("%Y-%m-%d %H:%M")
-                fmt_fields['createdBy'] = self._get_user_name(result['entity.createdByPrincipalId'])[:18]
-                fmt_fields['version']   = result['entity.versionNumber']
-                fmt_string += " {version:3}  {createdBy:>18} {createdOn}"
-            if show_modified:
-                fmt_fields['modifiedOn'] = utils.from_unix_epoch_time(result['entity.modifiedOn']).strftime("%Y-%m-%d %H:%M")
-                fmt_fields['modifiedBy'] = self._get_user_name(result['entity.modifiedByPrincipalId'])[:18]
-                fmt_string += "  {modifiedBy:>18} {modifiedOn}"
+            if long_format or show_modified:
+                #need to retrieve entity information
+                entity = self.get(result['id'], downloadFile=False)
+                if long_format:
+                    fmt_fields['createdOn'] = utils.iso_to_datetime(entity.createdOn).strftime(
+                        "%Y-%m-%d %H:%M")
+                    fmt_fields['createdBy'] = self._get_user_name(entity.createdBy)[:18]
+                    fmt_fields['version'] = result['versionNumber']
+                    fmt_string += " {version:3}  {createdBy:>18} {createdOn}"
+                if show_modified:
+                    fmt_fields['modifiedOn'] = utils.iso_to_datetime(entity.modifiedOn).strftime(
+                        "%Y-%m-%d %H:%M")
+                    fmt_fields['modifiedBy'] = self._get_user_name(entity.modifiedBy)[:18]
+                    fmt_string += "  {modifiedBy:>18} {modifiedOn}"
 
             fmt_string += "  {padding}{name}{slash_or_not}\n"
             out.write(fmt_string.format(**fmt_fields))
 
-            if (indent==0 or recursive) and is_container(result):
-                self._list(result['entity.id'], recursive=recursive, long_format=long_format, show_modified=show_modified, indent=indent+2, out=out)
+            if (indent == 0 or recursive) and is_container(result):
+                self.list(result['id'], recursive=recursive, long_format=long_format, show_modified=show_modified, indent=indent + 2, out=out)
 
-        if indent==0 and not results_found:
+        if indent == 0 and not results_found:
             out.write('No results visible to {username} found for id {id}\n'.format(username=self.username, id=id_of(parent)))
 
 

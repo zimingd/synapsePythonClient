@@ -282,7 +282,7 @@ def cat(args, syn):
 
 def ls(args, syn):
     """List entities in a Project or Folder"""
-    syn._list(args.id, recursive=args.recursive, long_format=args.long, show_modified=args.modified)
+    syn.list(args.id, recursive=args.recursive, long_format=args.long, show_modified=args.modified)
 
 
 def show(args, syn):
