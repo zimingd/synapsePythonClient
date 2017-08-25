@@ -1206,17 +1206,17 @@ class Synapse:
 
             if long_format or show_modified:
                 #need to retrieve entity information
-                entity = self.get(result['id'], downloadFile=False)
+                entity = self._getEntity(result['id'])
                 if long_format:
-                    fmt_fields['createdOn'] = utils.iso_to_datetime(entity.createdOn).strftime(
+                    fmt_fields['createdOn'] = utils.iso_to_datetime(entity['createdOn']).strftime(
                         "%Y-%m-%d %H:%M")
-                    fmt_fields['createdBy'] = self._get_user_name(entity.createdBy)[:18]
+                    fmt_fields['createdBy'] = self._get_user_name(entity['createdBy'])[:18]
                     fmt_fields['version'] = result['versionNumber']
                     fmt_string += " {version:3}  {createdBy:>18} {createdOn}"
                 if show_modified:
-                    fmt_fields['modifiedOn'] = utils.iso_to_datetime(entity.modifiedOn).strftime(
+                    fmt_fields['modifiedOn'] = utils.iso_to_datetime(entity['modifiedOn']).strftime(
                         "%Y-%m-%d %H:%M")
-                    fmt_fields['modifiedBy'] = self._get_user_name(entity.modifiedBy)[:18]
+                    fmt_fields['modifiedBy'] = self._get_user_name(entity['modifiedBy'])[:18]
                     fmt_string += "  {modifiedBy:>18} {modifiedOn}"
 
             fmt_string += "  {padding}{name}{slash_or_not}\n"
