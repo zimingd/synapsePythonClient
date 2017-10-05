@@ -713,6 +713,16 @@ class RowSet(DictObject):
         return cls(headers=headers, rows=rows,
             **{ key: json[key] for key in json.keys() if key not in ['headers', 'rows'] })
 
+    @classmethod
+    def from_list_of_rows(cls, syn, schema, list):
+        if isinstance(schema, Schema):
+            pass
+        elif isinstance(schema, list): #assume is a list of Columns
+            pass
+        rows = [cast_row(Row(row), headers) for row in list]
+        cls(schema=schema, rows=rows)
+
+
     def __init__(self, columns=None, schema=None, **kwargs):
         if not 'headers' in kwargs:
             if columns:
@@ -838,7 +848,8 @@ def Table(schema, values, **kwargs):
 
     ## a list of rows
     elif isinstance(values, (list, tuple)):
-        return CsvFileTable.from_list_of_rows(schema, values, **kwargs)
+        return RowSetTable.from_list_of_rows(schema, values, **kwargs)
+        # return CsvFileTable.from_list_of_rows(schema, values, **kwargs)
 
     ## filename of a csv file
     elif isinstance(values, six.string_types):
