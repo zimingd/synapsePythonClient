@@ -599,3 +599,20 @@ def test_synapse_integer_columns_with_missing_values_from_dataframe():
     print(table.filepath, table_from_dataframe.filepath)
     #compare to make sure no .0's were appended to the integers
     assert filecmp.cmp(table.filepath, table_from_dataframe.filepath)
+
+def test_CsvFileTable_as_dataframe_from_list():
+    columns = [Column(name="i1", columnType="INTEGER"), Column(name="i2", columnType="INTEGER")]
+    new_rows = [[1,2],[3,4]]
+    unstored_schema = Schema(name="csv_table_as_row_set_test", parent=project, columns=columns)
+    print(unstored_schema)
+    schema = syn.store(unstored_schema)
+    assert unstored_schema is not schema
+
+    print(unstored_schema)
+    print(schema)
+
+    stored_table = syn.store(Table(unstored_schema,new_rows))
+    rowset = stored_table.asRowSet()
+    print(rowset)
+
+

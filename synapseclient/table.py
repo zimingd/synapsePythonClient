@@ -849,8 +849,8 @@ def Table(schema, values, **kwargs):
 
     ## a list of rows
     elif isinstance(values, (list, tuple)):
-        return RowSetTable.from_list_of_rows(schema, values, **kwargs)
-        # return CsvFileTable.from_list_of_rows(schema, values, **kwargs)
+        # return RowSetTable.from_list_of_rows(schema, values, **kwargs)
+        return CsvFileTable.from_list_of_rows(schema, values, **kwargs)
 
     ## filename of a csv file
     elif isinstance(values, six.string_types):
