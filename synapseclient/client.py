@@ -103,7 +103,6 @@ STAGING_ENDPOINTS    = {'repoEndpoint':'https://repo-staging.prod.sagebase.org/r
                         'portalEndpoint':'https://staging.synapse.org/'}
 
 CONFIG_FILE = os.path.join(os.path.expanduser('~'), '.synapseConfig')
-SESSION_FILENAME = '.session'
 FILE_BUFFER_SIZE = 2*MB
 CHUNK_SIZE = 5*MB
 QUERY_LIMIT = 1000
@@ -379,7 +378,7 @@ class Synapse(object):
 
             # Note: make sure this key cannot conflict with usernames by using invalid username characters
             cachedSessions["<mostRecent>"] = self.username
-            self._writeSessionCache(cachedSessions)
+            _session_file_reader._writeSessionCache(cachedSessions)
 
         if not silent:
             profile = self.getUserProfile(refresh=True)
@@ -459,27 +458,6 @@ class Synapse(object):
         headers = {'sessionToken' : sessionToken, 'Accept': 'application/json'}
         secret = self.restGET('/secretKey', endpoint=self.authEndpoint, headers=headers)
         return base64.b64decode(secret['secretKey'])
-
-
-    def _readSessionCache(self):
-        """Returns the JSON contents of CACHE_DIR/SESSION_FILENAME."""
-        sessionFile = os.path.join(self.cache.cache_root_dir, SESSION_FILENAME)
-        if os.path.isfile(sessionFile):
-            try:
-                file = open(sessionFile, 'r')
-                result = json.load(file)
-                if isinstance(result, dict):
-                    return result
-            except: pass
-        return {}
-
-
-    def _writeSessionCache(self, data):
-        """Dumps the JSON data into CACHE_DIR/SESSION_FILENAME."""
-        sessionFile = os.path.join(self.cache.cache_root_dir, SESSION_FILENAME)
-        with open(sessionFile, 'w') as file:
-            json.dump(data, file)
-            file.write('\n') # For compatibility with R's JSON parser
 
 
     def _loggedIn(self):
