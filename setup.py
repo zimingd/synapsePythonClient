@@ -2,6 +2,7 @@
 ############################################################
 import sys
 from os.path import expanduser, exists
+import platform
 
 ## check Python version, before we do anything
 if sys.version_info < (2, 7, 0):
@@ -27,6 +28,15 @@ __version__=json.loads(open('synapseclient/synapsePythonClient').read())['latest
 
 #make sure not to overwrite existing .synapseConfig with our example one
 data_files = [(expanduser('~'), ['.synapseConfig'])] if not exists(expanduser('~/.synapseConfig')) else []
+install_requires = [
+        'requests>=1.2',
+        'six',
+        'future',
+        'backports.csv'
+    ]
+# Windows specific packages used for managing file permissions
+if platform.system() == "Windows":
+    install_requires.append('pywin32')
 
 setup(name='synapseclient',
     version=__version__,
@@ -38,12 +48,7 @@ setup(name='synapseclient',
     author_email='platform@sagebase.org',
     license='Apache',
     packages=find_packages(),
-    install_requires=[
-        'requests>=1.2',
-        'six',
-        'future',
-        'backports.csv'
-    ],
+    install_requires=install_requires,
     extras_require = {
         'pandas':  ["pandas"],
         'pysftp': ["pysftp>=0.2.8"],
