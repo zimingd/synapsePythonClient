@@ -1606,7 +1606,9 @@ class Synapse(object):
                                                                     profile_name=profile)
                 else:
                     if self.multi_threaded:
-                        expected_md5 = fileHandle.get('contentMd5')
+                        #TODO: revert md5 check after benchmarking complete
+                        # expected_md5 = fileHandle.get('contentMd5')
+                        expected_md5=None
                         url = fileResult['preSignedURL']
                         downloaded_path = self._download_from_url_multi_threaded(fileHandleId,
                                                                                  objectId,
