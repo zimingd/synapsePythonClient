@@ -1669,7 +1669,7 @@ class CsvFileTable(TableAbstractBaseClass):
             if '_LIST' in col['columnType']:
                     df[col['name']] = df[col['name']].apply(_list_column_to_string)
 
-        row_etag, row_id, row_version = cls.extract_synapse_metatdata_from_index(df)
+        row_id, row_version, row_etag = cls.extract_synapse_metatdata_from_index(df)
 
         # include row ID and version, if we're asked to OR if it's encoded in row names
         if includeRowIdAndRowVersion and any(row_id) and any(row_version):
@@ -1732,7 +1732,7 @@ class CsvFileTable(TableAbstractBaseClass):
             row_id.append(m.group(1) if m else None)
             row_version.append(m.group(2) if m else None)
             row_etag.append(m.group(4) if m else None)
-        return row_etag, row_id, row_version
+        return row_id, row_version, row_etag
 
     @staticmethod
     def _insert_dataframe_column_if_not_exist(dataframe, insert_index, col_name, insert_column_data):

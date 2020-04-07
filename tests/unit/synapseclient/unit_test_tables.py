@@ -1166,3 +1166,26 @@ def test_set_view_types_invalid_input():
     assert_equals(view['viewTypeMask'], 2)
     assert_raises(ValueError, view.set_entity_types, None)
 
+def test_extract_synapse_metatdata_from_index__normal_dataframe():
+    df = pd.DataFrame({'a':['a','b','c'],'b':[1,2,4]})
+    none_list = [None] * 3
+    assert_equals((none_list,none_list,none_list), CsvFileTable.extract_synapse_metatdata_from_index(df))
+
+def test_extract_synapse_metatdata_from_index__normal_dataframe():
+    df = pd.DataFrame({'a':['a','b','c'],'b':[1,2,4]})
+    df.index = ['1_1_4d2b116c-73a7-4eed-982f-07056980358e', '2_5_2621686d-92bd-4f0a-a1f8-cd275c0b97db',
+                '3_2_99f3096f-8b2a-48c4-93cb-eee6959fcd40']
+    row_ids = ['1','2','3']
+    row_versions = ['1','5','2']
+    row_etags = ['4d2b116c-73a7-4eed-982f-07056980358e','2621686d-92bd-4f0a-a1f8-cd275c0b97db',
+                 '99f3096f-8b2a-48c4-93cb-eee6959fcd40']
+    assert_equals((row_ids,row_versions,row_etags), CsvFileTable.extract_synapse_metatdata_from_index(df))
+
+def test_extract_synapse_metatdata_from_index__no_etag():
+    df = pd.DataFrame({'a':['a','b','c'],'b':[1,2,4]})
+    df.index = ['1_1', '2_5',
+                '3_2']
+    row_ids = ['1','2','3']
+    row_versions = ['1','5','2']
+    row_etags = [None] * 3
+    assert_equals((row_ids,row_versions, row_etags), CsvFileTable.extract_synapse_metatdata_from_index(df))
