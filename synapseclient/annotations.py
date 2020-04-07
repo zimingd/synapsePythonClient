@@ -64,7 +64,8 @@ Classes
 import collections
 
 from .entity import Entity
-from synapseclient.core.utils import to_unix_epoch_time, from_unix_epoch_time, is_date, to_list, id_of
+from synapseclient.core.utils import to_unix_epoch_time, from_unix_epoch_time, is_date, to_list, id_of, \
+    list_elements_type
 import typing
 import datetime
 
@@ -94,18 +95,6 @@ def is_synapse_annotations(annotations: typing.Mapping):
     if not isinstance(annotations, collections.abc.Mapping):
         return False
     return annotations.keys() >= {'id', 'etag', 'annotations'}
-
-
-def _annotation_value_list_element_type(annotation_values: typing.List):
-    if not annotation_values:
-        raise ValueError("annotations value list can not be empty")
-
-    first_element_type = type(annotation_values[0])
-
-    if all(isinstance(x, first_element_type) for x in annotation_values):
-        return first_element_type
-
-    return object
 
 
 def is_submission_status_annotations(annotations):
@@ -298,7 +287,7 @@ def to_synapse_annotations(annotations: Annotations) -> typing.Dict[str, typing.
     nested_annos = synapse_annos.setdefault('annotations', {})
     for key, value in annotations.items():
         elements = to_list(value)
-        element_cls = _annotation_value_list_element_type(elements)
+        element_cls = list_elements_type(elements)
         if issubclass(element_cls, str):
             nested_annos[key] = {'type': 'STRING',
                                  'value': elements}

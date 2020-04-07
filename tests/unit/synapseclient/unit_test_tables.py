@@ -21,10 +21,10 @@ import synapseclient.table
 from synapseclient.table import Column, Schema, CsvFileTable, TableQueryResult, cast_values, \
     as_table_columns, Table, build_table, RowSet, SelectColumn, EntityViewSchema, RowSetTable, Row, PartialRow, \
     PartialRowset, SchemaBase, _get_view_type_mask_for_deprecated_type, EntityViewType, _get_view_type_mask, \
-    MAX_NUM_TABLE_COLUMNS
+    MAX_NUM_TABLE_COLUMNS, get_cast_functions
 from tests import unit
 
-from synapseclient.core.utils import from_unix_epoch_time
+from synapseclient.core.utils import from_unix_epoch_time, from_unix_epoch_time_secs
 from mock import patch
 from collections import OrderedDict
 
@@ -33,7 +33,7 @@ def setup(module):
 
 
 def test_cast_values():
-    selectColumns = [{'id': '353',
+    select_columns = [{'id': '353',
                       'name': 'name',
                       'columnType': 'STRING'},
                      {'id': '354',
@@ -53,11 +53,13 @@ def test_cast_values():
                       'columnType': 'LINK'}]
 
     row = ('Finklestein', 'bat', '3.14159', '65535', 'true', 'https://www.synapse.org/')
-    assert_equals(cast_values(row, selectColumns),
+    cast_funcs = get_cast_functions(select_columns)
+
+    assert_equals(cast_values(row, cast_funcs),
                   ['Finklestein', 'bat', 3.14159, 65535, True, 'https://www.synapse.org/'])
 
     # group by
-    selectColumns = [{'name': 'bonk',
+    select_columns = [{'name': 'bonk',
                       'columnType': 'BOOLEAN'},
                      {'name': 'COUNT(name)',
                       'columnType': 'INTEGER'},
@@ -66,10 +68,12 @@ def test_cast_values():
                      {'name': 'SUM(n)',
                       'columnType': 'INTEGER'}]
     row = ('true', '211', '1.61803398875', '1421365')
-    assert_equals(cast_values(row, selectColumns), [True, 211, 1.61803398875, 1421365])
+    cast_funcs = get_cast_functions(select_columns)
+
+    assert_equals(cast_values(row, cast_funcs), [True, 211, 1.61803398875, 1421365])
 
 def test_cast_values__unknown_column_type():
-    selectColumns = [{'id': '353',
+    select_columns = [{'id': '353',
                       'name': 'name',
                       'columnType': 'INTEGER'},
                      {'id': '354',
@@ -77,13 +81,15 @@ def test_cast_values__unknown_column_type():
                       'columnType': 'DEFINTELY_NOT_A_EXISTING_TYPE'},
                     ]
 
+    cast_funcs = get_cast_functions(select_columns)
+
     row = ('123', 'othervalue')
-    assert_equals(cast_values(row, selectColumns),
+    assert_equals(cast_values(row, cast_funcs),
                   [123, 'othervalue'])
 
 
 def test_cast_values__list_type():
-    selectColumns = [{'id': '354',
+    select_columns = [{'id': '354',
                       'name': 'foo',
                       'columnType': 'STRING_LIST'},
                      {'id': '356',
@@ -97,7 +103,11 @@ def test_cast_values__list_type():
                       'columnType': 'DATE_LIST'}]
     now_millis = int(round(time.time() * 1000));
     row = ('["foo", "bar"]', '[1,2,3]', '[true, false]', '['+ str(now_millis) +']')
-    assert_equals(cast_values(row, selectColumns),
+
+    cast_funcs = get_cast_functions(select_columns)
+
+
+    assert_equals(cast_values(row, cast_funcs),
                   [["foo", "bar"], [1,2,3], [True, False], [from_unix_epoch_time(now_millis)]])
 
 
@@ -370,6 +380,75 @@ def test_csv_table():
                 print(ex)
         raise
 
+
+def test_csv_table_list_column_asDataFrame_round_trip():
+    # Maybe not truly a unit test, but here because it doesn't do
+    # network IO to synapse
+    data = [["1", "1", '["asdf","qwerty"]',  '[1926, 1234]', '[14204734,1093842]', '[true,false]'],
+            ["2", "1", '',  '', '', ''],
+            ["3", "1", '["test","strings"]',  '[345234, 9789]', '[1424123,10787]', '[true,true]']]
+
+    filename = None
+
+    cols = [Column(id='1', name='StrList', columnType='STRING_LIST'),
+            Column(id='2', name='IntList', columnType='INTEGER_LIST'),
+            Column(id='3', name='DateList', columnType='DATE_LIST'),
+            Column(id='4', name='BoolList', columnType='BOOLEAN_LIST')]
+
+    schema1 = Schema(id='syn1234', name='ListTest', columns=cols, parent="syn1000001")
+
+    try:
+        # create CSV file
+        with tempfile.NamedTemporaryFile(delete=False) as temp:
+            filename = temp.name
+
+        with io.open(filename, mode='w', encoding="utf-8", newline='') as temp:
+            writer = csv.writer(temp, quoting=csv.QUOTE_NONNUMERIC, lineterminator=str(os.linesep))
+            headers = ['ROW_ID', 'ROW_VERSION'] + [col.name for col in cols]
+            writer.writerow(headers)
+            for row in data:
+                writer.writerow(row)
+
+        table = Table(schema1, filename)
+        assert_is_instance(table, CsvFileTable)
+
+        # need to set column headers to read a CSV file
+        table.setColumnHeaders(
+            [SelectColumn(name="ROW_ID", columnType="STRING"),
+             SelectColumn(name="ROW_VERSION", columnType="STRING")] +
+            [SelectColumn.from_column(col) for col in cols])
+
+        # test dataframe for
+        df = table.asDataFrame()
+        assert_equals(list(df['StrList']), [["asdf","qwerty"],None,["test","strings"]])
+        assert_equals(list(df['IntList']), [[1926, 1234],None,[345234, 9789]])
+
+        date_list_unix_ts =  [[14204734,1093842], None,[1424123,10787]]
+        assert_equals(list(df['DateList']),[[from_unix_epoch_time(ts) for ts in ts_list] if ts_list else None
+                                            for ts_list in date_list_unix_ts])
+        assert_equals(list(df['BoolList']), [[True,False],None,[True,True]])
+        assert_equals(df.shape, (3, 4))
+
+
+        # now convert the dataframe back into a table
+        table_from_df = Table(table.schema, df)
+        lines = []
+        with open(table_from_df.filepath, 'r') as f:
+            for line in f:
+                lines.append(line)
+
+        expected = ['ROW_ID,ROW_VERSION,StrList,IntList,DateList,BoolList\n',
+                    '1,1,"[""asdf"", ""qwerty""]","[1926, 1234]","[""1970-01-01 03:56:44.734"", ""1970-01-01 00:18:13.842""]","[true, false]"\n',
+                    '2,1,,,,\n',
+                    '3,1,"[""test"", ""strings""]","[345234, 9789]","[""1970-01-01 00:23:44.123"", ""1970-01-01 00:00:10.787""]","[true, true]"\n']
+        assert_equals(expected, lines)
+
+    finally:
+        if filename:
+            try:
+                os.remove(filename)
+            except FileNotFoundError:
+                pass
 
 def test_list_of_rows_table():
     data = [["John Coltrane",  1926, 8.65, False],

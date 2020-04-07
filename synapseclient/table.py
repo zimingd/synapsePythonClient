@@ -298,9 +298,12 @@ import collections
 import abc
 import enum
 import json
+import functools
+import typing
+import datetime
 from builtins import zip
 
-from synapseclient.core.utils import id_of, from_unix_epoch_time
+from synapseclient.core.utils import id_of, from_unix_epoch_time, list_elements_type
 from synapseclient.core.exceptions import *
 from synapseclient.core.models.dict_object import DictObject
 from .entity import Entity, Versionable, entity_type_to_class
@@ -322,7 +325,6 @@ MAX_NUM_TABLE_COLUMNS = 152
 DEFAULT_QUOTE_CHARACTER = '"'
 DEFAULT_SEPARATOR = ","
 DEFAULT_ESCAPSE_CHAR = "\\"
-
 
 # This Enum is used to help users determine which Entity types they want in their view
 # Each item will be used to construct the viewTypeMask
@@ -390,7 +392,8 @@ def as_table_columns(values):
     """
     test_import_pandas()
     import pandas as pd
-
+    #TODO: add support for lists
+    #TODO: test
     df = None
 
     # filename of a csv file
@@ -407,7 +410,7 @@ def as_table_columns(values):
 
     cols = list()
     for col in df:
-        columnType = DTYPE_2_TABLETYPE[df[col].dtype.char]
+        columnType = _infer_synapse_column_type_from_dataframe_column(df[col])
         if columnType == 'STRING':
             maxStrLen = df[col].str.len().max()
             if maxStrLen > 1000:
@@ -419,6 +422,35 @@ def as_table_columns(values):
             cols.append(Column(name=col, columnType=columnType))
     return cols
 
+# TODO: test
+def _infer_synapse_column_type_from_dataframe_column(df_column: 'pandas.Series') -> str:
+    df_type: str = df_column.dtype.char
+    # encountered an  d-type of 'object', which may hold lists
+    if(df_type) == 'O':
+        # find first non-None value in the column
+        first_valid_idx = df_column.first_valid_index()
+        if first_valid_idx is not None: # index could be 0
+            valid_val = df_column[first_valid_idx]
+            #attempt to inteerrogate the list type
+            if isinstance(valid_val, collections.Iterable) and not isinstance(valid_val, str):
+                element_type = list_elements_type(valid_val)
+                if issubclass(element_type, str):
+                    return "STRING_LIST"
+                if issubclass(element_type, int):
+                    return "INTEGER_LIST"
+                if issubclass(element_type, datetime.datetime):
+                    return "DATE_LIST"
+                if issubclass(element_type, bool):
+                    return "BOOLEAN_LIST"
+
+    return DTYPE_2_TABLETYPE[df_type]
+
+def _list_column_to_string(list_val:typing.List) -> typing.Optional[str]:
+    # empty lists still have meaning to Synapse
+    if list_val is None:
+        return None
+    else:
+        return json.dumps(list_val)
 
 def df2Table(df, syn, tableName, parentProject):
     """Creates a new table from data in pandas data frame.
@@ -479,54 +511,67 @@ def row_labels_from_rows(rows):
                                            for row in rows])
 
 
-def cast_values(values, headers):
+
+def _ret_none_for_value_none_or_empty(func):
+    def decorated(value):
+        # convert field to column type
+        if not value:
+            return None
+        else:
+            return func(value)
+    return decorated
+
+@_ret_none_for_value_none_or_empty
+def _identity(x):
+    return x
+
+
+COL_TYPE_TO_FUNC: typing.Dict[str, typing.Callable[[str], typing.Any]] = \
+    collections.defaultdict(
+        lambda: _identity,
+        {
+            'STRING': _identity,
+            'ENTITYID': _identity,
+            'FILEHANDLEID': _identity,
+            'LARGETEXT': _identity,
+            'USERID': _identity,
+            'LINK': _identity,
+
+            'DOUBLE': _ret_none_for_value_none_or_empty(float),
+
+            'INTEGER': _ret_none_for_value_none_or_empty(int),
+
+            'BOOLEAN': _ret_none_for_value_none_or_empty(to_boolean),
+
+            'DATE': _ret_none_for_value_none_or_empty(from_unix_epoch_time),
+
+            'STRING_LIST': _ret_none_for_value_none_or_empty(json.loads),
+            'INTEGER_LIST': _ret_none_for_value_none_or_empty(json.loads),
+            'BOOLEAN_LIST': _ret_none_for_value_none_or_empty(json.loads),
+
+            'DATE_LIST': _ret_none_for_value_none_or_empty(functools.partial(json.loads, parse_int=from_unix_epoch_time))
+        }
+    )
+
+
+def get_cast_functions(headers) -> typing.List[typing.Callable[[str], typing.Union[str, int, float, datetime.datetime, typing.List]]]:
+    return [COL_TYPE_TO_FUNC[header.get('columnType', 'STRING')] for header in headers]
+
+def cast_values(values, cast_funcs):
     """
     Convert a row of table query results from strings to the correct column type.
 
     See: http://docs.synapse.org/rest/org/sagebionetworks/repo/model/table/ColumnType.html
     """
-    if len(values) != len(headers):
+    if len(values) != len(cast_funcs):
         raise ValueError('The number of columns in the csv file does not match the given headers. %d fields, %d headers'
-                         % (len(values), len(headers)))
+                         % (len(values), len(cast_funcs)))
 
-    result = []
-    for header, field in zip(headers, values):
+    return [cast_func(field) for field, cast_func in zip(values, cast_funcs)]
 
-        columnType = header.get('columnType', 'STRING')
-
-        # convert field to column type
-        if field is None or field == '':
-            result.append(None)
-        elif columnType in {'STRING', 'ENTITYID', 'FILEHANDLEID', 'LARGETEXT', 'USERID', 'LINK'}:
-            result.append(field)
-        elif columnType == 'DOUBLE':
-            result.append(float(field))
-        elif columnType == 'INTEGER':
-            result.append(int(field))
-        elif columnType == 'BOOLEAN':
-            result.append(to_boolean(field))
-        elif columnType == 'DATE':
-            result.append(from_unix_epoch_time(field))
-        elif columnType in {'STRING_LIST', 'INTEGER_LIST', 'BOOLEAN_LIST'}:
-            result.append(json.loads(field))
-        elif columnType == 'DATE_LIST':
-            result.append(json.loads(field, parse_int=from_unix_epoch_time))
-        else:
-            # default to string for unknown column type
-            result.append(field)
-
-    return result
-
-
-def cast_row(row, headers):
-    row['values'] = cast_values(row['values'], headers)
+def cast_row(row, cast_funcs):
+    row['values'] = cast_values(row['values'], cast_funcs)
     return row
-
-
-def cast_row_set(rowset):
-    for i, row in enumerate(rowset['rows']):
-        rowset['rows'][i]['values'] = cast_row(row, rowset['headers'])
-    return rowset
 
 
 def _csv_to_pandas_df(filepath,
@@ -536,7 +581,8 @@ def _csv_to_pandas_df(filepath,
                       contain_headers=True,
                       lines_to_skip=0,
                       date_columns=None,
-                      rowIdAndVersionInIndex=True):
+                      rowid_and_version_in_index=True,
+                      list_column_converters=None):
     test_import_pandas()
     import pandas as pd
 
@@ -556,8 +602,9 @@ def _csv_to_pandas_df(filepath,
                      header=0 if contain_headers else None,
                      skiprows=lines_to_skip,
                      parse_dates=date_columns,
-                     date_parser=datetime_millisecond_parser)
-    if rowIdAndVersionInIndex and "ROW_ID" in df.columns and "ROW_VERSION" in df.columns:
+                     date_parser=datetime_millisecond_parser,
+                     converters=list_column_converters) #TODO: test
+    if rowid_and_version_in_index and "ROW_ID" in df.columns and "ROW_VERSION" in df.columns:
         # combine row-ids (in index) and row-versions (in column 0) to
         # make new row labels consisting of the row id and version
         # separated by a dash.
@@ -1063,7 +1110,9 @@ class RowSet(AppendableRowset):
     @classmethod
     def from_json(cls, json):
         headers = [SelectColumn(**header) for header in json.get('headers', [])]
-        rows = [cast_row(Row(**row), headers) for row in json.get('rows', [])]
+        cast_funcs = get_cast_functions(headers)
+
+        rows = [cast_row(Row(**row), cast_funcs) for row in json.get('rows', [])]
         return cls(headers=headers, rows=rows,
                    **{key: json[key] for key in json.keys() if key not in ['headers', 'rows']})
 
@@ -1209,7 +1258,7 @@ def build_table(name, parent, values):
     return Table(schema, values, headers=headers)
 
 
-def Table(schema, values, **kwargs):
+def Table(schema: Schema, values, **kwargs):
     """
     Combine a table schema and a set of values into some type of Table object
     depending on what type of values are given.
@@ -1370,8 +1419,9 @@ class RowSetTable(TableAbstractBaseClass):
 
     def __iter__(self):
         def iterate_rows(rows, headers):
+            cast_funcs = get_cast_functions(headers)
             for row in rows:
-                yield cast_values(row, headers)
+                yield cast_values(row, cast_funcs)
         return iterate_rows(self.rowset['rows'], self.rowset['headers'])
 
     def __len__(self):
@@ -1604,7 +1654,7 @@ class CsvFileTable(TableAbstractBaseClass):
 
     @classmethod
     def from_data_frame(cls, schema, df, filepath=None, etag=None, quoteCharacter='"', escapeCharacter="\\",
-                        lineEnd=str(os.linesep), separator=",", header=True, includeRowIdAndRowVersion=None,
+                        lineEnd=str(os.linesep), separator=",", header=True, includeRowIdAndRowVersion=True,
                         headers=None, **kwargs):
         # infer columns from data frame if not specified
         if not headers:
@@ -1615,22 +1665,15 @@ class CsvFileTable(TableAbstractBaseClass):
         if isinstance(schema, Schema) and not schema.has_columns():
             schema.addColumns(cols)
 
-        # convert row names in the format [row_id]_[version] or [row_id]_[version]_[etag] back to columns
-        # etag is essentially a UUID
-        etag_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}'
-        row_id_version_pattern = re.compile(r'(\d+)_(\d+)(_(' + etag_pattern + r'))?')
+        # modify the dataframe as needed to serialize the *_LIST columnTypes into JSON arrays
+        for col in headers:
+            if '_LIST' in col['columnType']:
+                    df[col['name']] = df[col['name']].apply(_list_column_to_string)
 
-        row_id = []
-        row_version = []
-        row_etag = []
-        for row_name in df.index.values:
-            m = row_id_version_pattern.match(str(row_name))
-            row_id.append(m.group(1) if m else None)
-            row_version.append(m.group(2) if m else None)
-            row_etag.append(m.group(4) if m else None)
+        row_etag, row_id, row_version = cls.extract_synapse_metatdata_from_index(df)
 
         # include row ID and version, if we're asked to OR if it's encoded in row names
-        if includeRowIdAndRowVersion or (includeRowIdAndRowVersion is None and any(row_id)):
+        if includeRowIdAndRowVersion and any(row_id) and any(row_version):
             df2 = df.copy()
 
             cls._insert_dataframe_column_if_not_exist(df2, 0, 'ROW_ID', row_id)
@@ -1639,15 +1682,12 @@ class CsvFileTable(TableAbstractBaseClass):
                 cls._insert_dataframe_column_if_not_exist(df2, 2, 'ROW_ETAG', row_etag)
 
             df = df2
-            includeRowIdAndRowVersion = True
 
-        f = None
-        try:
-            if not filepath:
-                temp_dir = tempfile.mkdtemp()
-                filepath = os.path.join(temp_dir, 'table.csv')
+        if not filepath:
+            temp_dir = tempfile.mkdtemp()
+            filepath = os.path.join(temp_dir, 'table.csv')
 
-            f = io.open(filepath, mode='w', encoding='utf-8', newline='')
+        with open(filepath, mode='w', encoding='utf-8', newline='') as f:
 
             df.to_csv(f,
                       index=False,
@@ -1665,9 +1705,6 @@ class CsvFileTable(TableAbstractBaseClass):
             # values. pandas by default (with no float_format parameter) seems to keep 12 values after decimal, so we
             # use '%.12g'.c
             # see SYNPY-267.
-        finally:
-            if f:
-                f.close()
 
         return cls(
             schema=schema,
@@ -1680,6 +1717,23 @@ class CsvFileTable(TableAbstractBaseClass):
             header=header,
             includeRowIdAndRowVersion=includeRowIdAndRowVersion,
             headers=headers)
+
+    @classmethod
+    def extract_synapse_metatdata_from_index(cls, df: 'pandas.Dataframe') \
+        -> typing.Tuple[typing.List[str],typing.List[str],typing.List[str]]:
+        # convert row names in the format [row_id]_[version] or [row_id]_[version]_[etag] back to columns
+        # etag is essentially a UUID
+        etag_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}'
+        row_id_version_pattern = re.compile(r'(\d+)_(\d+)(_(' + etag_pattern + r'))?')
+        row_id = []
+        row_version = []
+        row_etag = []
+        for row_name in df.index.values:
+            m = row_id_version_pattern.match(str(row_name))
+            row_id.append(m.group(1) if m else None)
+            row_version.append(m.group(2) if m else None)
+            row_etag.append(m.group(4) if m else None)
+        return row_etag, row_id, row_version
 
     @staticmethod
     def _insert_dataframe_column_if_not_exist(dataframe, insert_index, col_name, insert_column_data):
@@ -1819,6 +1873,9 @@ class CsvFileTable(TableAbstractBaseClass):
                     if select_column.columnType == "DATE":
                         date_columns.append(select_column.name)
 
+            list_column_converters = { header['name']:COL_TYPE_TO_FUNC[header.get('columnType', 'STRING')]
+                                      for header in self.headers if '_LIST' in  header.get('columnType', 'STRING')}
+
             # assign line terminator only if for single character
             # line terminators (e.g. not '\r\n') 'cause pandas doesn't
             # longer line terminators. See:
@@ -1831,8 +1888,9 @@ class CsvFileTable(TableAbstractBaseClass):
                                      contain_headers=self.header,
                                      lines_to_skip=self.linesToSkip,
                                      date_columns=date_columns,
-                                     rowIdAndVersionInIndex=rowIdAndVersionInIndex)
-        except pd.parser.CParserError:
+                                     rowid_and_version_in_index=rowIdAndVersionInIndex,
+                                     list_column_converters=list_column_converters)
+        except pd.errors.ParserError:
             return pd.DataFrame()
 
     def asRowSet(self):
@@ -1893,8 +1951,9 @@ class CsvFileTable(TableAbstractBaseClass):
                 # 1. matching row metadata
                 # 2. if metadata does not match, self.headers must not contains row metadata
                 if num_metadata_cols_diff == 0 or num_row_metadata_in_headers == 0:
+                    cast_funcs = get_cast_functions(headers)
                     for row in reader:
-                        yield cast_values(row[num_metadata_cols_diff:], headers)
+                        yield cast_values(row[num_metadata_cols_diff:], cast_funcs)
                 else:
                     raise ValueError("There is mismatching row metadata in the csv file and in headers.")
         return iterate_rows(self.filepath, self.headers)

@@ -16,6 +16,8 @@ import datetime
 import errno
 import inspect
 import random
+import typing
+
 import requests
 import collections
 import tempfile
@@ -880,3 +882,15 @@ def attempt_import(module_name, fail_message):
 def require_param(param, name):
     if param is None:
         raise ValueError("%s parameter is required." %name)
+
+
+def list_elements_type(list_values: typing.List): # TODO: TEST
+    if not list_values:
+        raise ValueError("annotations value list can not be empty")
+
+    first_element_type = type(list_values[0])
+
+    if all(isinstance(x, first_element_type) for x in list_values):
+        return first_element_type
+
+    return object
