@@ -392,8 +392,6 @@ def as_table_columns(values):
     """
     test_import_pandas()
     import pandas as pd
-    #TODO: add support for lists
-    #TODO: test
     df = None
 
     # filename of a csv file
@@ -428,7 +426,7 @@ def _infer_synapse_column_type_from_dataframe_column(df_column: 'pandas.Series')
     # encountered an  d-type of 'object', which may hold lists
     if(df_type) == 'O':
         # find first non-None value in the column
-        first_valid_idx = df_column.first_valid_index()
+        first_valid_idx = df_column.first_valid_index() #TODO: test fist element is empty list []
         if first_valid_idx is not None: # index could be 0
             valid_val = df_column[first_valid_idx]
             #attempt to inteerrogate the list type
@@ -436,13 +434,14 @@ def _infer_synapse_column_type_from_dataframe_column(df_column: 'pandas.Series')
                 element_type = list_elements_type(valid_val)
                 if issubclass(element_type, str):
                     return "STRING_LIST"
-                if issubclass(element_type, int):
+                elif issubclass(element_type, int):
                     return "INTEGER_LIST"
-                if issubclass(element_type, datetime.datetime):
+                elif issubclass(element_type, datetime.datetime):
                     return "DATE_LIST"
-                if issubclass(element_type, bool):
+                elif issubclass(element_type, bool):
                     return "BOOLEAN_LIST"
-
+                else:
+                    return "STRING_LIST"
     return DTYPE_2_TABLETYPE[df_type]
 
 def _list_column_to_string(list_val:typing.List) -> typing.Optional[str]:
@@ -603,7 +602,7 @@ def _csv_to_pandas_df(filepath,
                      skiprows=lines_to_skip,
                      parse_dates=date_columns,
                      date_parser=datetime_millisecond_parser,
-                     converters=list_column_converters) #TODO: test
+                     converters=list_column_converters)
     if rowid_and_version_in_index and "ROW_ID" in df.columns and "ROW_VERSION" in df.columns:
         # combine row-ids (in index) and row-versions (in column 0) to
         # make new row labels consisting of the row id and version

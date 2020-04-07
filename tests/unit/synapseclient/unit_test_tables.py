@@ -197,7 +197,8 @@ def test_as_table_columns__with_pandas_DataFrame():
         'x': tuple(math.pi*i for i in range(5)),
         'n': (101, 202, 303, 404, 505),
         'really': (False, True, False, True, False),
-        'size': ('small', 'large', 'medium', 'medium', 'large')},
+        'size': ('small', 'large', 'medium', 'medium', 'large'),
+        'list': ([],None,['asdf'])},
     columns=['foobar', 'x', 'n', 'really', 'size'])
 
     cols = as_table_columns(df)

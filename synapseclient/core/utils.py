@@ -884,13 +884,11 @@ def require_param(param, name):
         raise ValueError("%s parameter is required." %name)
 
 
-def list_elements_type(list_values: typing.List): # TODO: TEST
-    if not list_values:
-        raise ValueError("annotations value list can not be empty")
+def list_elements_type(list_values: typing.List):
+    if list_values:
+        first_element_type = type(list_values[0])
 
-    first_element_type = type(list_values[0])
-
-    if all(isinstance(x, first_element_type) for x in list_values):
-        return first_element_type
+        if all(isinstance(x, first_element_type) for x in list_values):
+            return first_element_type
 
     return object

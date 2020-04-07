@@ -442,3 +442,12 @@ def test_calling_module():
     # since both _calling_module_test_helper and test_calling_module are a part of the unit_test module,
     # we can test that callers of the same module do indeed are skipped
     assert_equals("case", _calling_module_test_helper())
+
+def test_list_element_type():
+    assert_equals(str, utils.list_elements_type(['asdf','qwer']))
+    assert_equals(int, utils.list_elements_type([1,2,3,4]))
+    assert_equals(float, utils.list_elements_type([1.1,2.2,3.2,4.4]))
+
+    assert_equals(object, utils.list_elements_type([1, 'asd', 3]))
+
+    assert_equals(object, utils.list_elements_type([]))
